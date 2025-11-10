@@ -11,23 +11,14 @@ const _caveat = Caveat({ subsets: ["latin"], weight: ["400", "700"] })
 export const metadata: Metadata = {
   title: "Pepero Factory 🍫 - Design Your Sweet Gift",
   description: "Create, design, and gift custom Pepero sticks for Pepero Day",
-  generator: "v0.app",
   icons: {
     icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
       {
         url: "/icon.svg",
         type: "image/svg+xml",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: "/icon.svg",
   },
 }
 

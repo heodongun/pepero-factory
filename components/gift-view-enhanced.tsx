@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PeperoPreview3D } from "@/components/pepero-preview-3d"
@@ -11,6 +11,7 @@ import Link from "next/link"
 import { decodeDesign, sanitizeMessage } from "@/lib/design-utils"
 import type { PeperoDesign } from "@/lib/design-schema"
 import { chocolateTypes } from "@/lib/design-schema"
+import * as htmlToImage from "html-to-image"
 
 interface GiftViewEnhancedProps {
   payload: string
@@ -27,6 +28,8 @@ export function GiftViewEnhanced({ payload }: GiftViewEnhancedProps) {
   const [showConfetti, setShowConfetti] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [cardTemplate, setCardTemplate] = useState<keyof typeof messageCardTemplates>("simple")
+  const [isDownloading, setIsDownloading] = useState(false)
+  const captureRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // Decode the design from payload
@@ -62,6 +65,27 @@ export function GiftViewEnhanced({ payload }: GiftViewEnhancedProps) {
   }
 
   const chocolate = chocolateTypes.find((c) => c.id === design.coating)
+
+  const handleDownloadImage = async () => {
+    if (!captureRef.current || !design) return
+    setIsDownloading(true)
+    try {
+      const dataUrl = await htmlToImage.toPng(captureRef.current, {
+        backgroundColor: "#fdf8f4",
+        pixelRatio: window.devicePixelRatio || 2,
+      })
+
+      const link = document.createElement("a")
+      link.href = dataUrl
+      link.download = `pepero-gift-${design.from || "friend"}.png`
+      link.click()
+    } catch (error) {
+      console.error("[PeperoFactory] Failed to download image:", error)
+      alert("이미지를 저장할 수 없었어요. 다시 시도해 주세요.")
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -101,7 +125,10 @@ export function GiftViewEnhanced({ payload }: GiftViewEnhancedProps) {
       )}
 
       {/* Gift card */}
-      <Card className="p-8 md:p-12 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5 backdrop-blur mb-8">
+      <Card
+        ref={captureRef}
+        className="p-8 md:p-12 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5 backdrop-blur mb-8"
+      >
         <div className="text-center mb-8">
           <div className="text-6xl mb-4 animate-bounce">🎁</div>
           <h2 className="text-3xl font-bold mb-2">누군가 당신에게</h2>
@@ -175,17 +202,12 @@ export function GiftViewEnhanced({ payload }: GiftViewEnhancedProps) {
           <Button
             size="lg"
             variant="secondary"
-            onClick={() => {
-              // Save design to localStorage
-              const saved = JSON.parse(localStorage.getItem("saved-gifts") || "[]")
-              saved.push({ ...design, savedAt: new Date().toISOString() })
-              localStorage.setItem("saved-gifts", JSON.stringify(saved))
-              alert("선물이 저장되었습니다!")
-            }}
+            onClick={handleDownloadImage}
+            disabled={isDownloading}
             className="w-full sm:w-auto"
           >
             <Download className="mr-2 h-5 w-5" />
-            저장하기
+            {isDownloading ? "이미지 만드는 중..." : "이미지로 저장"}
           </Button>
         </div>
       </Card>

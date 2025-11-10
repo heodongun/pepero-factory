@@ -36,7 +36,7 @@ export function QRGenerator({ url }: QRGeneratorProps) {
       },
       (error) => {
         if (error) {
-          console.error("[v0] Failed to render QR:", error)
+          console.error("[PeperoFactory] Failed to render QR:", error)
           setQrError("QR 코드를 불러오지 못했어요. 링크를 복사해 공유해 보세요.")
         } else {
           setQrError(null)
@@ -51,7 +51,7 @@ export function QRGenerator({ url }: QRGeneratorProps) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error("[v0] Failed to copy:", error)
+      console.error("[PeperoFactory] Failed to copy:", error)
     }
   }
 

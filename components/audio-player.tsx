@@ -30,7 +30,7 @@ export function AudioPlayer({ enabled, onToggle }: AudioPlayerProps) {
       onToggle(false)
     } else {
       audioRef.current.play().catch((error) => {
-        console.error("[v0] Audio playback failed:", error)
+        console.error("[PeperoFactory] Audio playback failed:", error)
       })
       setIsPlaying(true)
       onToggle(true)

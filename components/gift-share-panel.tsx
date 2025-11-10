@@ -15,46 +15,42 @@ interface GiftSharePanelProps {
 
 export function GiftSharePanel({ design }: GiftSharePanelProps) {
   const [copied, setCopied] = useState(false)
-  const [shareMode, setShareMode] = useState<"inline" | "short">("inline")
+  const [shareUrl, setShareUrl] = useState("")
 
   const generateShareUrl = () => {
+    if (typeof window === "undefined") return ""
     const encoded = encodeDesign(design)
     if (!encoded) return ""
-
-    if (shareMode === "short") {
-      // In production, this would hit an API to generate a short code
-      // For now, use inline mode
-      const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
-      return `${baseUrl}/gift/${encoded}`
-    }
-
-    // Inline mode - full payload in URL
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
-    return `${baseUrl}/gift/${encoded}`
+    const url = `${window.location.origin}/gift/${encoded}`
+    setShareUrl(url)
+    return url
   }
-
-  const shareUrl = generateShareUrl()
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl)
+      const url = generateShareUrl()
+      if (!url) return
+      await navigator.clipboard.writeText(url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error("[v0] Failed to copy link:", error)
+      console.error("[PeperoFactory] Failed to copy link:", error)
     }
   }
 
   const handleNativeShare = async () => {
+    const url = generateShareUrl()
+    if (!url) return
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: "빼빼로 선물이 도착했어요!",
           text: design.message || "특별한 빼빼로를 만들었어요!",
-          url: shareUrl,
+          url,
         })
       } catch (error) {
-        console.error("[v0] Failed to share:", error)
+        console.error("[PeperoFactory] Failed to share:", error)
       }
     } else {
       handleCopyLink()
@@ -81,7 +77,9 @@ export function GiftSharePanel({ design }: GiftSharePanelProps) {
         </TabsList>
 
         <TabsContent value="link" className="space-y-4">
-          <div className="p-4 bg-muted rounded-lg break-all text-sm">{shareUrl}</div>
+          <div className="p-4 bg-muted rounded-lg break-all text-sm">
+            {shareUrl || "아직 공유 링크가 없어요. 아래 버튼을 누르면 즉시 생성돼요."}
+          </div>
 
           <div className="flex flex-col gap-3">
             <Button onClick={handleCopyLink} className="w-full">
@@ -112,7 +110,17 @@ export function GiftSharePanel({ design }: GiftSharePanelProps) {
         </TabsContent>
 
         <TabsContent value="qr">
-          <QRGenerator url={shareUrl} />
+          {shareUrl ? (
+            <QRGenerator url={shareUrl} />
+          ) : (
+            <div className="text-center space-y-4 py-6">
+              <p className="text-sm text-muted-foreground">링크를 생성하면 동일한 정보로 QR 코드도 만들 수 있어요.</p>
+              <Button onClick={() => generateShareUrl()}>
+                <QrCode className="mr-2 h-4 w-4" />
+                링크 생성하고 QR 보기
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </Card>

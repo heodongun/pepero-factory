@@ -28,75 +28,9 @@ export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
     canvas.height = height * pixelRatio
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
-    ctx.scale(pixelRatio, pixelRatio)
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
 
-    const draw = () => {
-      ctx.clearRect(0, 0, width, height)
-
-      // Draw Pepero stick with 3D effect
-      const centerX = width / 2
-      const centerY = height / 2
-      const stickWidth = 44
-      const stickHeight = 260
-      const coatingHeight = stickHeight * 0.72
-
-      // clean background to keep pepero crisp
-      ctx.save()
-      ctx.fillStyle = "#ffffff"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.restore()
-
-      drawStageShadow(ctx, centerX, centerY + stickHeight / 2 - 20, stickWidth * 2)
-
-      ctx.save()
-      ctx.translate(centerX, centerY)
-
-      // Draw shadow
-      ctx.shadowColor = "rgba(15, 23, 42, 0.35)"
-      ctx.shadowBlur = 28
-      ctx.shadowOffsetX = 4
-      ctx.shadowOffsetY = 6
-
-      drawBiscuit(ctx, stickWidth, stickHeight, coatingHeight)
-      drawChocolateLayer(ctx, {
-        stickWidth,
-        stickHeight,
-        coatingHeight,
-        chocolateColor: chocolate.color,
-        glossiness: chocolate.glossiness,
-        shimmerOffset: design.toppings.length % 5,
-      })
-
-      // Draw toppings with physics-inspired placement
-      design.toppings.forEach((topping, idx) => {
-        const isValidTopping = toppingOptions.some((t) => t.id === topping.type)
-        if (!isValidTopping) return
-
-        for (let i = 0; i < Math.min(topping.count, 12); i++) {
-          const angle = (i / topping.count) * Math.PI * 2 + idx * 0.6
-          const yPos = -stickHeight / 2 + 20 + (i / topping.count) * coatingHeight * 0.8
-          const offsetSeed = seededRandom(idx * 10 + i)
-          const xOffset = Math.sin(angle) * 5 + (offsetSeed - 0.5) * 10
-          const scale = 0.85 + offsetSeed * 0.08
-          const rotation = (offsetSeed - 0.5) * Math.PI * 0.6
-
-          ctx.save()
-          ctx.translate(xOffset, yPos)
-          ctx.scale(scale, scale)
-          ctx.rotate(rotation)
-          ctx.shadowColor = "rgba(0, 0, 0, 0.25)"
-          ctx.shadowBlur = 3
-          drawToppingShape(ctx, topping.type, topping.color, offsetSeed)
-          ctx.restore()
-        }
-      })
-
-      ctx.restore()
-
-      ctx.restore()
-    }
-
-    draw()
+    drawScene(ctx, width, height, chocolate.color, chocolate.glossiness, design)
   }, [design])
 
   return (
@@ -106,170 +40,159 @@ export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
   )
 }
 
-// Helper to adjust brightness
-function adjustBrightness(color: string, factor: number): string {
-  const hex = color.replace("#", "")
-  const r = Math.min(255, Math.floor(Number.parseInt(hex.substr(0, 2), 16) * factor))
-  const g = Math.min(255, Math.floor(Number.parseInt(hex.substr(2, 2), 16) * factor))
-  const b = Math.min(255, Math.floor(Number.parseInt(hex.substr(4, 2), 16) * factor))
-  return `rgb(${r}, ${g}, ${b})`
-}
-
-function seededRandom(seed: number) {
-  return (Math.sin(seed * 12345.678) + 1) / 2
-}
-
-function drawBiscuit(
+function drawScene(
   ctx: CanvasRenderingContext2D,
-  stickWidth: number,
-  stickHeight: number,
-  coatingHeight: number,
+  width: number,
+  height: number,
+  chocolateColor: string,
+  glossiness: number,
+  design: PeperoDesign,
 ) {
-  const coatingBottom = coatingHeight - stickHeight / 2
-  const biscuitGradient = ctx.createLinearGradient(0, coatingBottom, 0, stickHeight / 2)
-  biscuitGradient.addColorStop(0, "#F5DEB3")
-  biscuitGradient.addColorStop(0.4, "#E0BA7C")
-  biscuitGradient.addColorStop(1, "#CC9A54")
+  ctx.clearRect(0, 0, width, height)
+  ctx.fillStyle = "#ffffff"
+  ctx.fillRect(0, 0, width, height)
 
-  ctx.fillStyle = biscuitGradient
+  const centerX = width / 2
+  const centerY = height / 2
+  const stickWidth = 46
+  const stickHeight = 270
+  const top = -stickHeight / 2
+
+  drawStageShadow(ctx, centerX, centerY + stickHeight / 2 - 18, stickWidth * 2.1)
+
   ctx.save()
-  ctx.beginPath()
-  ctx.moveTo(-stickWidth / 2, coatingBottom)
-  ctx.lineTo(-stickWidth / 2, stickHeight / 2 - 15)
-  ctx.quadraticCurveTo(0, stickHeight / 2, stickWidth / 2, stickHeight / 2 - 15)
-  ctx.lineTo(stickWidth / 2, coatingBottom)
-  ctx.closePath()
-  ctx.fill()
+  ctx.translate(centerX, centerY)
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"
-  ctx.lineWidth = 1
-  ctx.stroke()
-  ctx.restore()
+  drawStickWithHandle(ctx, {
+    stickWidth,
+    stickHeight,
+    chocolateColor,
+    glossiness,
+  })
 
-  // biscuit texture
-  ctx.save()
-  ctx.strokeStyle = "rgba(150, 95, 35, 0.25)"
-  ctx.lineWidth = 1
-  for (let i = 0; i < 6; i++) {
-    const y = coatingBottom + 10 + i * 12
-    ctx.beginPath()
-    ctx.moveTo(-stickWidth / 3, y)
-    ctx.lineTo(stickWidth / 3, y + 3)
-    ctx.stroke()
-  }
+  design.toppings.forEach((topping, idx) => {
+    const isValid = toppingOptions.some((option) => option.id === topping.type)
+    if (!isValid) return
+
+    const total = Math.min(topping.count, 12)
+    for (let i = 0; i < total; i++) {
+      const progress = i / total
+      const y = top + 30 + progress * (stickHeight - 60)
+      const jitter = seededRandom(idx * 17 + i)
+      const xOffset = Math.sin(idx + i * 1.2) * 6 + (jitter - 0.5) * 8
+      const scale = 0.85 + jitter * 0.12
+      const rotation = (jitter - 0.5) * Math.PI * 0.4
+
+      ctx.save()
+      ctx.translate(xOffset, y)
+      ctx.scale(scale, scale)
+      ctx.rotate(rotation)
+      ctx.shadowColor = "rgba(0, 0, 0, 0.18)"
+      ctx.shadowBlur = 3
+      drawToppingShape(ctx, topping.type, topping.color, jitter)
+      ctx.restore()
+    }
+  })
+
   ctx.restore()
 }
 
-function drawChocolateLayer(
+function drawStickWithHandle(
   ctx: CanvasRenderingContext2D,
   {
     stickWidth,
     stickHeight,
-    coatingHeight,
     chocolateColor,
     glossiness,
-    shimmerOffset,
   }: {
     stickWidth: number
     stickHeight: number
-    coatingHeight: number
     chocolateColor: string
     glossiness: number
-    shimmerOffset: number
   },
 ) {
   const top = -stickHeight / 2
-  const bottom = top + coatingHeight
+  const bottom = stickHeight / 2
+  const coatingHeight = stickHeight * 0.72
+  const coatingBottom = top + coatingHeight
 
-  const gradient = ctx.createLinearGradient(0, top, 0, bottom)
-  gradient.addColorStop(0, adjustBrightness(chocolateColor, 1.15))
-  gradient.addColorStop(0.5, chocolateColor)
-  gradient.addColorStop(1, adjustBrightness(chocolateColor, 0.85))
+  const baseGradient = ctx.createLinearGradient(0, coatingBottom - 10, 0, bottom)
+  baseGradient.addColorStop(0, "#f8deb2")
+  baseGradient.addColorStop(0.6, "#dca66b")
+  baseGradient.addColorStop(1, "#b2763f")
 
-  ctx.fillStyle = gradient
+  ctx.fillStyle = baseGradient
   ctx.beginPath()
-  ctx.moveTo(-stickWidth / 2, bottom)
-  ctx.lineTo(-stickWidth / 2, top + 12)
-  ctx.quadraticCurveTo(-stickWidth / 2, top - 12, -stickWidth / 3, top - 14)
-  ctx.quadraticCurveTo(0, top - 18, stickWidth / 3, top - 14)
-  ctx.quadraticCurveTo(stickWidth / 2, top - 12, stickWidth / 2, top + 12)
-  ctx.lineTo(stickWidth / 2, bottom - 8)
-  ctx.quadraticCurveTo(0, bottom + 16, -stickWidth / 2, bottom - 8)
+  ctx.moveTo(-stickWidth / 2, bottom - 14)
+  ctx.quadraticCurveTo(-stickWidth / 2, bottom + 6, 0, bottom)
+  ctx.quadraticCurveTo(stickWidth / 2, bottom + 6, stickWidth / 2, bottom - 14)
+  ctx.lineTo(stickWidth / 2, top + 12)
+  ctx.quadraticCurveTo(stickWidth / 2, top - 10, 0, top - 14)
+  ctx.quadraticCurveTo(-stickWidth / 2, top - 10, -stickWidth / 2, top + 12)
   ctx.closePath()
   ctx.fill()
 
-  // rim glow
-  ctx.strokeStyle = "rgba(255,255,255,0.15)"
+  ctx.save()
+  ctx.beginPath()
+  ctx.moveTo(-stickWidth / 2, coatingBottom - 6)
+  ctx.lineTo(-stickWidth / 2, top + 12)
+  ctx.quadraticCurveTo(-stickWidth / 2, top - 10, 0, top - 14)
+  ctx.quadraticCurveTo(stickWidth / 2, top - 10, stickWidth / 2, top + 12)
+  ctx.lineTo(stickWidth / 2, coatingBottom - 6)
+  ctx.quadraticCurveTo(stickWidth / 2, coatingBottom + 2, 0, coatingBottom + 6)
+  ctx.quadraticCurveTo(-stickWidth / 2, coatingBottom + 2, -stickWidth / 2, coatingBottom - 6)
+  ctx.closePath()
+
+  const chocolateGradient = ctx.createLinearGradient(0, top, 0, coatingBottom + 4)
+  chocolateGradient.addColorStop(0, adjustBrightness(chocolateColor, 1.2))
+  chocolateGradient.addColorStop(0.5, chocolateColor)
+  chocolateGradient.addColorStop(1, adjustBrightness(chocolateColor, 0.85))
+
+  ctx.fillStyle = chocolateGradient
+  ctx.fill()
+  ctx.restore()
+
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"
   ctx.lineWidth = 1
   ctx.stroke()
 
-  // chocolate drips for a freshly dipped look
-  ctx.fillStyle = adjustBrightness(chocolateColor, 0.9)
-  ctx.beginPath()
-  ctx.moveTo(-stickWidth / 3, top + 6)
-  ctx.quadraticCurveTo(-stickWidth / 4, top + 42, -stickWidth / 5, top + 44)
-  ctx.quadraticCurveTo(-stickWidth / 5, top + 28, -stickWidth / 4, top + 14)
-  ctx.closePath()
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.moveTo(stickWidth / 4, top + 8)
-  ctx.quadraticCurveTo(stickWidth / 5, top + 46, stickWidth / 6, top + 48)
-  ctx.quadraticCurveTo(stickWidth / 6, top + 30, stickWidth / 5, top + 16)
-  ctx.closePath()
-  ctx.fill()
-
-  // subtle texture lines
-  ctx.save()
-  ctx.globalAlpha = 0.08
-  ctx.strokeStyle = adjustBrightness(chocolateColor, 1.3)
-  for (let i = -stickWidth / 2 + 4; i < stickWidth / 2 - 4; i += 6) {
-    ctx.beginPath()
-    ctx.moveTo(i, top + 10)
-    ctx.quadraticCurveTo(i + stickWidth * 0.03, top + coatingHeight / 2, i, bottom - 16)
-    ctx.stroke()
-  }
-  ctx.restore()
-
-  // meniscus highlight
-  const meniscusIntensity = 0.25 + (shimmerOffset % 3) * 0.03
-  ctx.strokeStyle = `rgba(255, 255, 255, ${meniscusIntensity})`
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(-stickWidth / 2 + 6, top)
-  ctx.quadraticCurveTo(0, top - 10, stickWidth / 2 - 6, top)
-  ctx.stroke()
-
-  // glossy highlight
-  const highlightGradient = ctx.createLinearGradient(-stickWidth / 2, top, stickWidth / 2, top)
-  highlightGradient.addColorStop(0, "rgba(255,255,255,0)")
-  highlightGradient.addColorStop(0.4, `rgba(255,255,255,${glossiness * 0.35})`)
-  highlightGradient.addColorStop(0.6, `rgba(255,255,255,${glossiness * 0.45})`)
-  highlightGradient.addColorStop(1, "rgba(255,255,255,0)")
-  ctx.fillStyle = highlightGradient
-  ctx.fillRect(-stickWidth / 2, top + 8, stickWidth, coatingHeight * 0.5)
-
   ctx.save()
   ctx.globalCompositeOperation = "lighter"
-  ctx.globalAlpha = 0.15
-  ctx.fillStyle = "#ffffff"
+  ctx.globalAlpha = 0.35
+  ctx.fillStyle = "rgba(255,255,255,0.8)"
   ctx.beginPath()
-  ctx.ellipse(0, top + coatingHeight * 0.25, stickWidth * 0.35, coatingHeight * 0.25, 0, 0, Math.PI * 2)
+  ctx.ellipse(0, top + 30, stickWidth * 0.35, 18, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 
-  // subtle cocoa dust speckles
+  ctx.save()
+  const shine = ctx.createLinearGradient(-stickWidth / 2, 0, stickWidth / 2, 0)
+  shine.addColorStop(0, "rgba(255,255,255,0.15)")
+  shine.addColorStop(0.25, `rgba(255,255,255,${glossiness * 0.4})`)
+  shine.addColorStop(0.55, "rgba(255,255,255,0)")
+  ctx.fillStyle = shine
+  ctx.beginPath()
+  ctx.roundRect?.(-stickWidth / 2 + 5, top + 24, 8, stickHeight - 48, 4)
+  if (!ctx.roundRect) {
+    ctx.rect(-stickWidth / 2 + 5, top + 24, 8, stickHeight - 48)
+  }
+  ctx.fill()
+  ctx.restore()
+
   ctx.save()
   ctx.globalAlpha = 0.12
   ctx.fillStyle = adjustBrightness(chocolateColor, 0.65)
-  for (let i = 0; i < 20; i++) {
-    const x = -stickWidth / 2 + 8 + (i * 7) % (stickWidth - 16)
-    const y = top + 20 + ((i * 23) % (coatingHeight - 40))
+  for (let i = 0; i < 14; i++) {
+    const x = -stickWidth / 2 + 8 + ((i * 13) % (stickWidth - 16))
+    const y = top + 24 + ((i * 21) % (coatingHeight - 48))
     ctx.beginPath()
     ctx.arc(x, y, 0.8, 0, Math.PI * 2)
     ctx.fill()
   }
   ctx.restore()
+
+  drawHandleDetails(ctx, stickWidth, coatingBottom, bottom)
+  drawCoatingSeam(ctx, stickWidth, coatingBottom, chocolateColor)
 }
 
 function drawStageShadow(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
@@ -278,6 +201,55 @@ function drawStageShadow(ctx: CanvasRenderingContext2D, x: number, y: number, wi
   ctx.beginPath()
   ctx.ellipse(x, y, width, width * 0.18, 0, 0, Math.PI * 2)
   ctx.fill()
+  ctx.restore()
+}
+
+function drawHandleDetails(ctx: CanvasRenderingContext2D, stickWidth: number, seamY: number, bottom: number) {
+  ctx.save()
+  ctx.strokeStyle = "rgba(120, 78, 28, 0.25)"
+  ctx.lineWidth = 1
+  for (let i = 0; i < 6; i++) {
+    const y = seamY + 10 + i * 12
+    ctx.beginPath()
+    ctx.moveTo(-stickWidth / 3, y)
+    ctx.lineTo(stickWidth / 3, y + 3)
+    ctx.stroke()
+  }
+
+  ctx.fillStyle = "rgba(120, 78, 28, 0.25)"
+  for (let i = 0; i < 12; i++) {
+    const x = -stickWidth / 3 + (i * 11) % (stickWidth * 0.6)
+    const y = seamY + 14 + (i * 17) % (bottom - seamY - 10)
+    ctx.beginPath()
+    ctx.arc(x, y, 1.1, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
+function drawCoatingSeam(ctx: CanvasRenderingContext2D, stickWidth: number, seamY: number, chocolateColor: string) {
+  ctx.save()
+  const gradient = ctx.createLinearGradient(0, seamY - 18, 0, seamY + 28)
+  gradient.addColorStop(0, "rgba(255,255,255,0)")
+  gradient.addColorStop(0.25, adjustBrightness(chocolateColor, 0.85))
+  gradient.addColorStop(0.6, "rgba(203, 134, 68, 0.6)")
+  gradient.addColorStop(1, "rgba(249, 214, 162, 0.35)")
+
+  ctx.fillStyle = gradient
+  ctx.beginPath()
+  ctx.moveTo(-stickWidth / 2 + 4, seamY - 10)
+  ctx.quadraticCurveTo(0, seamY + 6, stickWidth / 2 - 4, seamY - 10)
+  ctx.lineTo(stickWidth / 2 - 4, seamY + 20)
+  ctx.quadraticCurveTo(0, seamY + 32, -stickWidth / 2 + 4, seamY + 20)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.25)"
+  ctx.lineWidth = 0.8
+  ctx.beginPath()
+  ctx.moveTo(-stickWidth / 2 + 8, seamY - 4)
+  ctx.quadraticCurveTo(0, seamY + 4, stickWidth / 2 - 8, seamY - 4)
+  ctx.stroke()
   ctx.restore()
 }
 
@@ -311,7 +283,7 @@ function drawToppingShape(ctx: CanvasRenderingContext2D, type: ToppingType, colo
       for (let i = 0; i < 3; i++) {
         ctx.beginPath()
         const angle = seed * Math.PI * (i + 1)
-        ctx.arc(Math.cos(angle) * 3, Math.sin(angle) * 3, 1.5, 0, Math.PI * 2)
+        ctx.arc(Math.cos(angle) * 3, Math.sin(angle) * 3, 1.4, 0, Math.PI * 2)
         ctx.fill()
       }
       break
@@ -376,4 +348,17 @@ function drawRoundedRect(
   ctx.lineTo(x, y + r)
   ctx.quadraticCurveTo(x, y, x + r, y)
   ctx.closePath()
+}
+
+// Helper to adjust brightness
+function adjustBrightness(color: string, factor: number): string {
+  const hex = color.replace("#", "")
+  const r = Math.min(255, Math.floor(Number.parseInt(hex.substring(0, 2), 16) * factor))
+  const g = Math.min(255, Math.floor(Number.parseInt(hex.substring(2, 4), 16) * factor))
+  const b = Math.min(255, Math.floor(Number.parseInt(hex.substring(4, 6), 16) * factor))
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+function seededRandom(seed: number) {
+  return (Math.sin(seed * 12345.678) + 1) / 2
 }

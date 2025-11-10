@@ -22,11 +22,11 @@ export function encodeDesign(design: PeperoDesign): string {
     }
 
     const json = JSON.stringify(compact)
-    const base64 = btoa(json)
+    const base64 = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(Number.parseInt(p1, 16))))
     // Make URL-safe
     return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
   } catch (error) {
-    console.error("[v0] Error encoding design:", error)
+    console.error("[PeperoFactory] Error encoding design:", error)
     return ""
   }
 }
@@ -40,7 +40,12 @@ export function decodeDesign(encoded: string): PeperoDesign | null {
       base64 += "="
     }
 
-    const json = atob(base64)
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join(""),
+    )
     const compact = JSON.parse(json)
 
     const design: PeperoDesign = {
@@ -62,7 +67,7 @@ export function decodeDesign(encoded: string): PeperoDesign | null {
 
     return validateDesign(design) ? design : null
   } catch (error) {
-    console.error("[v0] Error decoding design:", error)
+    console.error("[PeperoFactory] Error decoding design:", error)
     return null
   }
 }
@@ -188,7 +193,7 @@ export function saveDesignToHistory(design: PeperoDesign): void {
 
     localStorage.setItem("pepero-history", JSON.stringify(newHistory))
   } catch (error) {
-    console.error("[v0] Error saving to history:", error)
+    console.error("[PeperoFactory] Error saving to history:", error)
   }
 }
 
@@ -197,7 +202,7 @@ export function getDesignHistory(): PeperoDesign[] {
   try {
     return JSON.parse(localStorage.getItem("pepero-history") || "[]")
   } catch (error) {
-    console.error("[v0] Error reading history:", error)
+    console.error("[PeperoFactory] Error reading history:", error)
     return []
   }
 }
