@@ -1,5 +1,49 @@
 import type { PeperoDesign } from "./design-schema"
 import { validateDesign, chocolateTypes, toppingOptions, wrapperStyles } from "./design-schema"
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "./lz-string"
+
+const universalAtob =
+  typeof atob === "function"
+    ? (data: string) => atob(data)
+    : typeof globalThis !== "undefined" && typeof (globalThis as any).atob === "function"
+      ? (data: string) => (globalThis as any).atob(data)
+      : typeof globalThis !== "undefined" && (globalThis as any).Buffer
+        ? (data: string) => (globalThis as any).Buffer.from(data, "base64").toString("binary")
+        : null
+
+function decodeLegacyPayload(encoded: string): string | null {
+  if (!encoded) return null
+  try {
+    let base64 = encoded.replace(/-/g, "+").replace(/_/g, "/")
+    while (base64.length % 4) {
+      base64 += "="
+    }
+
+    if (!universalAtob) {
+      console.warn("[PeperoFactory] No base64 decoder available for legacy payload")
+      return null
+    }
+
+    const binary = universalAtob(base64)
+    return decodeURIComponent(
+      binary
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join(""),
+    )
+  } catch (error) {
+    console.error("[PeperoFactory] Legacy decode failed:", error)
+    return null
+  }
+}
+
+const safeDecodeURIComponent = (value: string) => {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
 
 // Encode design to base64url for sharing
 export function encodeDesign(design: PeperoDesign): string {
@@ -22,9 +66,7 @@ export function encodeDesign(design: PeperoDesign): string {
     }
 
     const json = JSON.stringify(compact)
-    const base64 = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(Number.parseInt(p1, 16))))
-    // Make URL-safe
-    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
+    return compressToEncodedURIComponent(json)
   } catch (error) {
     console.error("[PeperoFactory] Error encoding design:", error)
     return ""
@@ -34,18 +76,12 @@ export function encodeDesign(design: PeperoDesign): string {
 // Decode base64url back to design object
 export function decodeDesign(encoded: string): PeperoDesign | null {
   try {
-    // Restore base64 format
-    let base64 = encoded.replace(/-/g, "+").replace(/_/g, "/")
-    while (base64.length % 4) {
-      base64 += "="
+    const normalizedPayload = safeDecodeURIComponent(encoded)
+    let json = decompressFromEncodedURIComponent(normalizedPayload)
+    if (!json) {
+      json = decodeLegacyPayload(normalizedPayload)
     }
-
-    const json = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
-        .join(""),
-    )
+    if (!json) return null
     const compact = JSON.parse(json)
 
     const design: PeperoDesign = {
