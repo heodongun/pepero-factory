@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import type { PeperoDesign, ToppingType } from "@/lib/design-schema"
 import { chocolateTypes, toppingOptions } from "@/lib/design-schema"
 
@@ -10,8 +10,6 @@ interface PeperoPreview3DProps {
 
 export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
-  const [isAnimating, setIsAnimating] = useState(true)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -23,34 +21,35 @@ export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
     const chocolate = chocolateTypes.find((c) => c.id === design.coating)
     if (!chocolate) return
 
-    let rotation = 0
-    let time = 0
+    const pixelRatio = window.devicePixelRatio || 1
+    const width = 300
+    const height = 400
+    canvas.width = width * pixelRatio
+    canvas.height = height * pixelRatio
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+    ctx.scale(pixelRatio, pixelRatio)
 
-    const animate = () => {
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-      time += 0.01
+    const draw = () => {
+      ctx.clearRect(0, 0, width, height)
 
       // Draw Pepero stick with 3D effect
-      const centerX = canvas.width / 2
-      const centerY = canvas.height / 2
+      const centerX = width / 2
+      const centerY = height / 2
       const stickWidth = 44
       const stickHeight = 260
       const coatingHeight = stickHeight * 0.72
 
-      drawBackdrop(ctx, canvas.width, canvas.height, chocolate.color)
-      drawAtmosphere(ctx, canvas.width, canvas.height, time)
-      drawStageShadow(ctx, centerX, centerY + stickHeight / 2 - 20, stickWidth * 2)
+      // clean background to keep pepero crisp
+      ctx.save()
+      ctx.fillStyle = "#ffffff"
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.restore()
 
-      // Apply slow rotation
-      if (isAnimating) {
-        rotation += 0.002
-      }
+      drawStageShadow(ctx, centerX, centerY + stickHeight / 2 - 20, stickWidth * 2)
 
       ctx.save()
       ctx.translate(centerX, centerY)
-      ctx.rotate(rotation)
 
       // Draw shadow
       ctx.shadowColor = "rgba(15, 23, 42, 0.35)"
@@ -65,7 +64,7 @@ export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
         coatingHeight,
         chocolateColor: chocolate.color,
         glossiness: chocolate.glossiness,
-        time,
+        shimmerOffset: design.toppings.length % 5,
       })
 
       // Draw toppings with physics-inspired placement
@@ -74,19 +73,19 @@ export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
         if (!isValidTopping) return
 
         for (let i = 0; i < Math.min(topping.count, 12); i++) {
-          const angle = (i / topping.count) * Math.PI * 2 + idx
+          const angle = (i / topping.count) * Math.PI * 2 + idx * 0.6
           const yPos = -stickHeight / 2 + 20 + (i / topping.count) * coatingHeight * 0.8
           const offsetSeed = seededRandom(idx * 10 + i)
-          const xOffset = Math.sin(angle + time) * 6 + (offsetSeed - 0.5) * 10
-          const scale = 0.8 + Math.sin(time + i) * 0.1
-          const rotation = (offsetSeed - 0.5) * Math.PI
+          const xOffset = Math.sin(angle) * 5 + (offsetSeed - 0.5) * 10
+          const scale = 0.85 + offsetSeed * 0.08
+          const rotation = (offsetSeed - 0.5) * Math.PI * 0.6
 
           ctx.save()
           ctx.translate(xOffset, yPos)
           ctx.scale(scale, scale)
           ctx.rotate(rotation)
-          ctx.shadowColor = "rgba(0, 0, 0, 0.35)"
-          ctx.shadowBlur = 4
+          ctx.shadowColor = "rgba(0, 0, 0, 0.25)"
+          ctx.shadowBlur = 3
           drawToppingShape(ctx, topping.type, topping.color, offsetSeed)
           ctx.restore()
         }
@@ -94,24 +93,11 @@ export function PeperoPreview3D({ design }: PeperoPreview3DProps) {
 
       ctx.restore()
 
-      // Continue animation
-      animationRef.current = requestAnimationFrame(animate)
+      ctx.restore()
     }
 
-    animate()
-
-    // Check for reduced motion
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
-    if (mediaQuery.matches) {
-      setIsAnimating(false)
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-    }
-  }, [design, isAnimating])
+    draw()
+  }, [design])
 
   return (
     <div className="relative w-full">
@@ -146,6 +132,7 @@ function drawBiscuit(
   biscuitGradient.addColorStop(1, "#CC9A54")
 
   ctx.fillStyle = biscuitGradient
+  ctx.save()
   ctx.beginPath()
   ctx.moveTo(-stickWidth / 2, coatingBottom)
   ctx.lineTo(-stickWidth / 2, stickHeight / 2 - 15)
@@ -157,6 +144,20 @@ function drawBiscuit(
   ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"
   ctx.lineWidth = 1
   ctx.stroke()
+  ctx.restore()
+
+  // biscuit texture
+  ctx.save()
+  ctx.strokeStyle = "rgba(150, 95, 35, 0.25)"
+  ctx.lineWidth = 1
+  for (let i = 0; i < 6; i++) {
+    const y = coatingBottom + 10 + i * 12
+    ctx.beginPath()
+    ctx.moveTo(-stickWidth / 3, y)
+    ctx.lineTo(stickWidth / 3, y + 3)
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 function drawChocolateLayer(
@@ -167,14 +168,14 @@ function drawChocolateLayer(
     coatingHeight,
     chocolateColor,
     glossiness,
-    time,
+    shimmerOffset,
   }: {
     stickWidth: number
     stickHeight: number
     coatingHeight: number
     chocolateColor: string
     glossiness: number
-    time: number
+    shimmerOffset: number
   },
 ) {
   const top = -stickHeight / 2
@@ -231,7 +232,8 @@ function drawChocolateLayer(
   ctx.restore()
 
   // meniscus highlight
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 + Math.sin(time * 2) * 0.05})`
+  const meniscusIntensity = 0.25 + (shimmerOffset % 3) * 0.03
+  ctx.strokeStyle = `rgba(255, 255, 255, ${meniscusIntensity})`
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(-stickWidth / 2 + 6, top)
@@ -249,44 +251,30 @@ function drawChocolateLayer(
 
   ctx.save()
   ctx.globalCompositeOperation = "lighter"
-  ctx.globalAlpha = 0.12
+  ctx.globalAlpha = 0.15
   ctx.fillStyle = "#ffffff"
   ctx.beginPath()
   ctx.ellipse(0, top + coatingHeight * 0.25, stickWidth * 0.35, coatingHeight * 0.25, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
-}
 
-function drawBackdrop(ctx: CanvasRenderingContext2D, width: number, height: number, chocolateColor: string) {
-  const gradient = ctx.createRadialGradient(width / 2, height * 0.35, 60, width / 2, height / 2, height * 0.7)
-  gradient.addColorStop(0, adjustBrightness(chocolateColor, 1.5))
-  gradient.addColorStop(0.4, "#fdf6f0")
-  gradient.addColorStop(1, "#f1f5f9")
-
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, width, height)
-}
-
-function drawAtmosphere(ctx: CanvasRenderingContext2D, width: number, height: number, time: number) {
+  // subtle cocoa dust speckles
   ctx.save()
-  ctx.globalAlpha = 0.08
-  ctx.fillStyle = "#94a3b8"
-
-  for (let i = 0; i < 12; i++) {
-    const flicker = Math.sin(time * 2 + i) * 0.5 + 0.5
-    const x = ((i * 97) % width) + Math.sin(time + i) * 10
-    const y = ((i * 53) % (height / 1.2)) + Math.cos(time * 0.9 + i) * 10
+  ctx.globalAlpha = 0.12
+  ctx.fillStyle = adjustBrightness(chocolateColor, 0.65)
+  for (let i = 0; i < 20; i++) {
+    const x = -stickWidth / 2 + 8 + (i * 7) % (stickWidth - 16)
+    const y = top + 20 + ((i * 23) % (coatingHeight - 40))
     ctx.beginPath()
-    ctx.arc(x, y, 2 + flicker * 2, 0, Math.PI * 2)
+    ctx.arc(x, y, 0.8, 0, Math.PI * 2)
     ctx.fill()
   }
-
   ctx.restore()
 }
 
 function drawStageShadow(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
   ctx.save()
-  ctx.fillStyle = "rgba(15, 23, 42, 0.18)"
+  ctx.fillStyle = "rgba(15, 23, 42, 0.08)"
   ctx.beginPath()
   ctx.ellipse(x, y, width, width * 0.18, 0, 0, Math.PI * 2)
   ctx.fill()
