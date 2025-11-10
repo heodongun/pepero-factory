@@ -1,6 +1,8 @@
 import { Suspense } from "react"
 import { GiftViewEnhanced } from "@/components/gift-view-enhanced"
 
+export const runtime = "edge"
+
 export default async function EncodedGiftPage({ params }: { params: Promise<{ payload: string }> }) {
   const { payload } = await params
 
