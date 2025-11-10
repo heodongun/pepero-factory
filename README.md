@@ -1,6 +1,7 @@
 # Pepero Factory
 
 커스텀 빼빼로를 디자인하고 공유할 수 있는 Next.js 16 + React 19 애플리케이션입니다. 3D 미리보기, QR 공유, 메시지 카드 템플릿 등을 제공하며 Cloudflare Pages로 배포됩니다.
+배포 링크 : https://8d9998a2.pepero-factory.pages.dev/
 
 ## 주요 기능
 - **Pepero Maker**: 초콜릿·토핑·포장 꾸미기와 실시간 WebGL 프리뷰
